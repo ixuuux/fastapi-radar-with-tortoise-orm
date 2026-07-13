@@ -52,7 +52,9 @@ def apply_tortoise_patch():
         original_execute_script = getattr(client_cls, "execute_script", None)
         original_execute_insert = getattr(client_cls, "execute_insert", None)
 
-        async def new_execute_query(self, query: str, values: list | None = None, *args, **kwargs):
+        async def new_execute_query(
+                self, query: str, values: list | None = None, *args, __original_execute_query=original_execute_query, **kwargs
+        ):
             # Skip internal queries if needed, or rely on listeners to filter
 
             ctxs = []
@@ -71,7 +73,7 @@ def apply_tortoise_patch():
             result = None
 
             try:
-                result = await original_execute_query(self, query, values, *args, **kwargs)
+                result = await __original_execute_query(self, query, values, *args, **kwargs)
                 return result
             except Exception as e:
                 exc = e
@@ -86,7 +88,9 @@ def apply_tortoise_patch():
                     except Exception:
                         pass
 
-        async def new_execute_script(self, query: str, *args, **kwargs):
+        async def new_execute_script(
+                self, query: str, *args, __original_execute_script=original_execute_script, **kwargs
+        ):
             ctxs = []
             values = []  # Script usually has no values binding
             for listener in _listeners:
@@ -103,8 +107,8 @@ def apply_tortoise_patch():
             result = None
 
             try:
-                if original_execute_script:
-                    result = await original_execute_script(self, query, *args, **kwargs)
+                if __original_execute_script:
+                    result = await __original_execute_script(self, query, *args, **kwargs)
                 return result
             except Exception as e:
                 exc = e
@@ -119,7 +123,9 @@ def apply_tortoise_patch():
                     except Exception:
                         pass
 
-        async def new_execute_insert(self, query: str, values: list, *args, **kwargs):
+        async def new_execute_insert(
+                self, query: str, values: list, *args, __original_execute_insert=original_execute_insert, **kwargs
+        ):
             ctxs = []
             for listener in _listeners:
                 try:
@@ -135,8 +141,8 @@ def apply_tortoise_patch():
             result = None
 
             try:
-                if original_execute_insert:
-                    result = await original_execute_insert(self, query, values, *args, **kwargs)
+                if __original_execute_insert:
+                    result = await __original_execute_insert(self, query, values, *args, **kwargs)
                 return result
             except Exception as e:
                 exc = e
