@@ -22,22 +22,93 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SearchInput } from "@/components/ui/search-input";
 import { RequestItem } from "@/components/RequestItem";
 import { useDebounce } from "@/hooks/useDebounce";
-import { Filter, Download, RefreshCw } from "lucide-react";
+import { Filter, Download, RefreshCw, Calendar } from "lucide-react";
 import { useDetailDrawer } from "@/context/DetailDrawerContext";
 import { useT } from "@/i18n";
+import { Input } from "@/components/ui/input";
 
 export function RequestsPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [methodFilter, setMethodFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState("all");
-  const [timeRange, setTimeRange] = useState<number | null>(null); // hours
+  const [timeRange, setTimeRange] = useState<number | null>(null);
+  const [customStartTime, setCustomStartTime] = useState("");
+  const [customEndTime, setCustomEndTime] = useState("");
+  const [useCustomRange, setUseCustomRange] = useState(false);
+  const [timeError, setTimeError] = useState("");
   const { openDetail } = useDetailDrawer();
   const t = useT();
 
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
 
-  // Get all requests
+  const formatToLocalISO = (date: Date): string => {
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  };
+
+  const applyCustomPreset = (preset: string) => {
+    const now = new Date();
+    let start = new Date();
+    
+    switch (preset) {
+      case 'today':
+        start.setHours(0, 0, 0, 0);
+        break;
+      case 'yesterday':
+        start.setDate(start.getDate() - 1);
+        start.setHours(0, 0, 0, 0);
+        const end = new Date(start);
+        end.setHours(23, 59, 59, 999);
+        setCustomStartTime(formatToLocalISO(start));
+        setCustomEndTime(formatToLocalISO(end));
+        setTimeError("");
+        return;
+      case 'last3Hours':
+        start.setHours(start.getHours() - 3);
+        break;
+      case 'thisWeek':
+        start.setDate(start.getDate() - start.getDay());
+        start.setHours(0, 0, 0, 0);
+        break;
+      case 'last7Days':
+        start.setDate(start.getDate() - 7);
+        break;
+      case 'lastMonth':
+        start.setMonth(start.getMonth() - 1);
+        break;
+      default:
+        start.setHours(start.getHours() - 24);
+    }
+    
+    setCustomStartTime(formatToLocalISO(start));
+    setCustomEndTime(formatToLocalISO(now));
+    setTimeError("");
+  };
+
+  const validateTimeRange = () => {
+    if (customStartTime && customEndTime) {
+      const start = new Date(customStartTime);
+      const end = new Date(customEndTime);
+      if (start > end) {
+        setTimeError(t('requests.filters.timeRangeError'));
+        return false;
+      }
+    }
+    setTimeError("");
+    return true;
+  };
+
+  const handleCustomRangeToggle = (enabled: boolean) => {
+    setUseCustomRange(enabled);
+    if (enabled && !customStartTime && !customEndTime) {
+      const now = new Date();
+      const start = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      setCustomStartTime(formatToLocalISO(start));
+      setCustomEndTime(formatToLocalISO(now));
+    }
+  };
+
   const { data: allRequests, refetch } = useQuery({
     queryKey: ["all-requests", statusFilter, methodFilter, debouncedSearchTerm, timeRange],
     queryFn: () => {
@@ -49,13 +120,20 @@ export function RequestsPage() {
         search: debouncedSearchTerm || undefined,
       };
 
-      if (timeRange) {
+      if (useCustomRange) {
+        if (customStartTime) {
+          params.start_time = new Date(customStartTime).toISOString();
+        }
+        if (customEndTime) {
+          params.end_time = new Date(customEndTime).toISOString();
+        }
+      } else if (timeRange) {
         params.start_time = new Date(Date.now() - timeRange * 60 * 60 * 1000).toISOString();
       }
 
       return apiClient.getRequests(params);
     },
-    refetchInterval: 5000,
+    refetchInterval: useCustomRange ? false : 5000,
   });
 
   // Calculate counts for tabs
@@ -100,7 +178,9 @@ export function RequestsPage() {
   };
 
   const applyFilters = () => {
-    refetch();
+    if (validateTimeRange()) {
+      refetch();
+    }
   };
 
   const exportData = () => {
@@ -197,36 +277,145 @@ export function RequestsPage() {
 
             <div className="space-y-2">
               <Label>{t('requests.filters.timeRange')}</Label>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Button
-                  variant={timeRange === null ? "default" : "outline"}
+                  variant={!useCustomRange && timeRange === null ? "default" : "outline"}
                   size="sm"
-                  onClick={() => setTimeRange(null)}
+                  onClick={() => { setTimeRange(null); setUseCustomRange(false); }}
                 >
                   {t('requests.timeRangeFilters.all')}
                 </Button>
                 <Button
-                  variant={timeRange === 1 ? "default" : "outline"}
+                  variant={!useCustomRange && timeRange === 1 ? "default" : "outline"}
                   size="sm"
-                  onClick={() => setTimeRange(1)}
+                  onClick={() => { setTimeRange(1); setUseCustomRange(false); }}
                 >
                   {t('requests.timeRangeFilters.lastHour')}
                 </Button>
                 <Button
-                  variant={timeRange === 24 ? "default" : "outline"}
+                  variant={!useCustomRange && timeRange === 24 ? "default" : "outline"}
                   size="sm"
-                  onClick={() => setTimeRange(24)}
+                  onClick={() => { setTimeRange(24); setUseCustomRange(false); }}
                 >
                   {t('requests.timeRangeFilters.last24Hours')}
                 </Button>
                 <Button
-                  variant={timeRange === 168 ? "default" : "outline"}
+                  variant={!useCustomRange && timeRange === 168 ? "default" : "outline"}
                   size="sm"
-                  onClick={() => setTimeRange(168)}
+                  onClick={() => { setTimeRange(168); setUseCustomRange(false); }}
                 >
                   {t('requests.timeRangeFilters.last7Days')}
                 </Button>
+                <Button
+                  variant={useCustomRange ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => handleCustomRangeToggle(true)}
+                >
+                  <Calendar className="mr-2 h-4 w-4" />
+                  {t('requests.timeRangeFilters.custom')}
+                </Button>
               </div>
+
+              {useCustomRange && (
+                <div className="mt-4 space-y-4 p-4 rounded-lg border border-border bg-muted/30">
+                  <div className="flex flex-wrap gap-2">
+                    <Badge
+                      variant="secondary"
+                      className="cursor-pointer hover:bg-accent transition-colors"
+                      onClick={() => applyCustomPreset('today')}
+                    >
+                      {t('requests.customPresets.today')}
+                    </Badge>
+                    <Badge
+                      variant="secondary"
+                      className="cursor-pointer hover:bg-accent transition-colors"
+                      onClick={() => applyCustomPreset('yesterday')}
+                    >
+                      {t('requests.customPresets.yesterday')}
+                    </Badge>
+                    <Badge
+                      variant="secondary"
+                      className="cursor-pointer hover:bg-accent transition-colors"
+                      onClick={() => applyCustomPreset('last3Hours')}
+                    >
+                      {t('requests.customPresets.last3Hours')}
+                    </Badge>
+                    <Badge
+                      variant="secondary"
+                      className="cursor-pointer hover:bg-accent transition-colors"
+                      onClick={() => applyCustomPreset('thisWeek')}
+                    >
+                      {t('requests.customPresets.thisWeek')}
+                    </Badge>
+                    <Badge
+                      variant="secondary"
+                      className="cursor-pointer hover:bg-accent transition-colors"
+                      onClick={() => applyCustomPreset('last7Days')}
+                    >
+                      {t('requests.customPresets.last7Days')}
+                    </Badge>
+                    <Badge
+                      variant="secondary"
+                      className="cursor-pointer hover:bg-accent transition-colors"
+                      onClick={() => applyCustomPreset('lastMonth')}
+                    >
+                      {t('requests.customPresets.lastMonth')}
+                    </Badge>
+                  </div>
+
+                  <div className="flex gap-4 items-end">
+                    <div className="flex-1 space-y-2">
+                      <Label htmlFor="startTime">{t('requests.filters.startTime')}</Label>
+                      <Input
+                        id="startTime"
+                        type="datetime-local"
+                        value={customStartTime}
+                        onChange={(e) => { setCustomStartTime(e.target.value); validateTimeRange(); }}
+                        className="w-full"
+                      />
+                    </div>
+                    <div className="flex-1 space-y-2">
+                      <Label htmlFor="endTime">{t('requests.filters.endTime')}</Label>
+                      <Input
+                        id="endTime"
+                        type="datetime-local"
+                        value={customEndTime}
+                        onChange={(e) => { setCustomEndTime(e.target.value); validateTimeRange(); }}
+                        className="w-full"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setCustomStartTime("");
+                          setCustomEndTime("");
+                          setTimeError("");
+                        }}
+                      >
+                        {t('common.clear')}
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          if (validateTimeRange()) {
+                            refetch();
+                          }
+                        }}
+                      >
+                        {t('requests.filters.apply')}
+                      </Button>
+                    </div>
+                  </div>
+                  {timeError && (
+                    <p className="text-sm text-red-500">{timeError}</p>
+                  )}
+                  <div className="text-sm text-muted-foreground">
+                    {t('requests.filters.timeRangeHint')}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </CardContent>

@@ -218,6 +218,10 @@ export interface Translations {
       description: string;
       timeRange: string;
       apply: string;
+      startTime: string;
+      endTime: string;
+      timeRangeError: string;
+      timeRangeHint: string;
     };
     tabs: {
       all: string;
@@ -248,6 +252,15 @@ export interface Translations {
       lastHour: string;
       last24Hours: string;
       last7Days: string;
+      custom: string;
+    };
+    customPresets: {
+      today: string;
+      yesterday: string;
+      last3Hours: string;
+      thisWeek: string;
+      last7Days: string;
+      lastMonth: string;
     };
     descriptions: {
       all: string;
@@ -650,6 +663,10 @@ const en: Translations = {
       description: "Filter and search through request logs",
       timeRange: "Time Range",
       apply: "Apply Filters",
+      startTime: "Start Time",
+      endTime: "End Time",
+      timeRangeError: "Start time must be before end time",
+      timeRangeHint: "Select a start and end time to filter requests within a specific period",
     },
     tabs: {
       all: "All Requests",
@@ -680,6 +697,15 @@ const en: Translations = {
       lastHour: "Last Hour",
       last24Hours: "Last 24 Hours",
       last7Days: "Last 7 Days",
+      custom: "Custom Range",
+    },
+    customPresets: {
+      today: "Today",
+      yesterday: "Yesterday",
+      last3Hours: "Last 3 Hours",
+      thisWeek: "This Week",
+      last7Days: "Last 7 Days",
+      lastMonth: "Last Month",
     },
     descriptions: {
       all: "Complete list of all HTTP requests",
@@ -1075,6 +1101,10 @@ const zh: Translations = {
       description: "筛选和搜索请求日志",
       timeRange: "时间范围",
       apply: "应用筛选器",
+      startTime: "开始时间",
+      endTime: "结束时间",
+      timeRangeError: "开始时间必须早于结束时间",
+      timeRangeHint: "选择开始和结束时间来筛选特定时间段内的请求",
     },
     tabs: {
       all: "所有请求",
@@ -1105,6 +1135,15 @@ const zh: Translations = {
       lastHour: "最近1小时",
       last24Hours: "最近24小时",
       last7Days: "最近7天",
+      custom: "自定义范围",
+    },
+    customPresets: {
+      today: "今天",
+      yesterday: "昨天",
+      last3Hours: "最近3小时",
+      thisWeek: "本周",
+      last7Days: "最近7天",
+      lastMonth: "上个月",
     },
     descriptions: {
       all: "所有 HTTP 请求的完整列表",
