@@ -40,6 +40,11 @@ class RequestSummary(BaseModel):
     created_at: datetime
 
 
+class PaginatedRequestSummary(BaseModel):
+    items: List[RequestSummary]
+    has_more: bool
+
+
 class RequestDetail(BaseModel):
     id: int
     request_id: str
@@ -150,15 +155,17 @@ def create_api_router(auth_dependency: Optional[Callable] = None) -> APIRouter:
 
     router = APIRouter(prefix="/__radar/api", tags=["radar"], dependencies=dependencies)
 
-    @router.get("/requests", response_model=List[RequestSummary])
+    @router.get("/requests", response_model=PaginatedRequestSummary)
     async def get_requests(
         limit: int = Query(100, ge=1, le=1000),
         offset: int = Query(0, ge=0),
+        cursor: Optional[int] = Query(None, ge=0),
         status_code: Optional[int] = None,
         method: Optional[str] = None,
         search: Optional[str] = None,
         start_time: Optional[datetime] = None,
         end_time: Optional[datetime] = None,
+        slow_threshold: Optional[int] = Query(None, ge=0),
     ):
         query = CapturedRequest.all()
 
@@ -182,10 +189,16 @@ def create_api_router(auth_dependency: Optional[Callable] = None) -> APIRouter:
             query = query.filter(method=method)
         if search:
             query = query.filter(path__icontains=search)
+        if slow_threshold:
+            query = query.filter(duration_ms__gte=slow_threshold)
 
-        requests = await query.order_by("-created_at").offset(offset).limit(limit).prefetch_related("queries", "exceptions")
+        if cursor is not None:
+            query = query.filter(id__lt=cursor)
+            requests = await query.order_by("-created_at").limit(limit).prefetch_related("queries", "exceptions")
+        else:
+            requests = await query.order_by("-created_at").offset(offset).limit(limit).prefetch_related("queries", "exceptions")
 
-        return [
+        items = [
             RequestSummary(
                 id=req.id,
                 request_id=req.request_id,
@@ -199,6 +212,16 @@ def create_api_router(auth_dependency: Optional[Callable] = None) -> APIRouter:
             )
             for req in requests
         ]
+
+        has_more = False
+        if len(items) >= limit:
+            if cursor is not None:
+                last_id = items[-1].id if items else cursor
+                has_more = await query.filter(id__lt=last_id).exists()
+            else:
+                has_more = await query.offset(offset + limit).exists()
+
+        return PaginatedRequestSummary(items=items, has_more=has_more)
 
     @router.get("/requests/{request_id}", response_model=RequestDetail)
     async def get_request_detail(request_id: str):

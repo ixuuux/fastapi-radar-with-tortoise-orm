@@ -36,14 +36,14 @@ export function RequestsList() {
 
       {/* Requests List */}
       <div className="space-y-2">
-        {requests?.map((request) => (
+        {requests?.items?.map((request) => (
           <RequestItem
             key={request.id}
             request={request}
             onClick={() => openDetail("request", request.request_id)}
           />
         ))}
-        {requests?.length === 0 && (
+        {requests?.items?.length === 0 && (
           <div className="text-center py-8 text-muted-foreground">
             No requests captured yet
           </div>

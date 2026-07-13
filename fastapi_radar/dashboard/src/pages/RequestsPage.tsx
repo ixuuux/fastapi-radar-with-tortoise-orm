@@ -1,6 +1,6 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { apiClient } from "@/api/client";
+import { useState, useCallback } from "react";
+import { useInfiniteQuery } from "@tanstack/react-query";
+import { apiClient, PaginatedRequestSummary } from "@/api/client";
 import {
   Card,
   CardContent,
@@ -109,32 +109,56 @@ export function RequestsPage() {
     }
   };
 
-  const { data: allRequests, refetch } = useQuery({
-    queryKey: ["all-requests", statusFilter, methodFilter, debouncedSearchTerm, timeRange],
-    queryFn: () => {
-      const params: any = {
-        limit: 200,
-        status_code:
-          statusFilter !== "all" ? getStatusCode(statusFilter) : undefined,
-        method: methodFilter !== "all" ? methodFilter : undefined,
-        search: debouncedSearchTerm || undefined,
-      };
+  const PAGE_SIZE = 50;
 
-      if (useCustomRange) {
-        if (customStartTime) {
-          params.start_time = new Date(customStartTime).toISOString();
-        }
-        if (customEndTime) {
-          params.end_time = new Date(customEndTime).toISOString();
-        }
-      } else if (timeRange) {
-        params.start_time = new Date(Date.now() - timeRange * 60 * 60 * 1000).toISOString();
+  const getFilterParams = useCallback(() => {
+    const params: any = {
+      limit: PAGE_SIZE,
+      status_code:
+        statusFilter !== "all" ? getStatusCode(statusFilter) : undefined,
+      method: methodFilter !== "all" ? methodFilter : undefined,
+      search: debouncedSearchTerm || undefined,
+    };
+
+    if (activeTab === "slow") {
+      params.slow_threshold = 500;
+    }
+
+    if (useCustomRange) {
+      if (customStartTime) {
+        params.start_time = new Date(customStartTime).toISOString();
       }
+      if (customEndTime) {
+        params.end_time = new Date(customEndTime).toISOString();
+      }
+    } else if (timeRange) {
+      params.start_time = new Date(Date.now() - timeRange * 60 * 60 * 1000).toISOString();
+    }
 
+    return params;
+  }, [statusFilter, methodFilter, debouncedSearchTerm, timeRange, useCustomRange, customStartTime, customEndTime, activeTab]);
+
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage, refetch } = useInfiniteQuery({
+    queryKey: ["all-requests", statusFilter, methodFilter, debouncedSearchTerm, timeRange, activeTab],
+    queryFn: async ({ pageParam }) => {
+      const params = getFilterParams();
+      if (pageParam) {
+        params.cursor = pageParam;
+      }
       return apiClient.getRequests(params);
     },
-    refetchInterval: useCustomRange ? false : 5000,
+    getNextPageParam: (lastPage: PaginatedRequestSummary) => {
+      if (lastPage.has_more && lastPage.items.length > 0) {
+        return lastPage.items[lastPage.items.length - 1].id;
+      }
+      return undefined;
+    },
+    initialPageParam: undefined,
+    refetchInterval: false,
+    refetchIntervalInBackground: false,
   });
+
+  const allRequests = data?.pages.flatMap((page) => page.items) || [];
 
   // Calculate counts for tabs
   const successfulCount =
@@ -493,6 +517,17 @@ export function RequestsPage() {
                     {activeTab === "successful" && t('requests.empty.successful')}
                     {activeTab === "failed" && t('requests.empty.failed')}
                     {activeTab === "slow" && t('requests.empty.slow')}
+                  </div>
+                )}
+                {hasNextPage && (
+                  <div className="text-center py-4">
+                    <Button
+                      variant="outline"
+                      onClick={() => fetchNextPage()}
+                      disabled={isFetchingNextPage}
+                    >
+                      {isFetchingNextPage ? t('requests.loadingMore') : t('requests.loadMore')}
+                    </Button>
                   </div>
                 )}
               </div>

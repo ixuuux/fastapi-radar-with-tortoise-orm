@@ -79,7 +79,7 @@ export function DashboardPage() {
 
   // Use centralized metrics calculations
   const metrics = useMetrics({
-    requests: recentRequests,
+    requests: recentRequests?.items || null,
     queries: null,
     exceptions: recentExceptions,
     stats,
@@ -96,7 +96,7 @@ export function DashboardPage() {
 
   // Prepare data for charts
   const timeSeriesData =
-    recentRequests
+    recentRequests?.items
       ?.slice(0, 20)
       .reverse()
       .map((req) => ({
@@ -374,7 +374,7 @@ export function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {recentRequests?.slice(0, 5).map((request) => (
+              {recentRequests?.items?.slice(0, 5).map((request) => (
                 <div
                   key={request.id}
                   className="flex items-center justify-between cursor-pointer hover:bg-muted/50 p-2 -mx-2 rounded transition-colors"
@@ -412,7 +412,7 @@ export function DashboardPage() {
                   </div>
                 </div>
               ))}
-              {(!recentRequests || recentRequests.length === 0) && (
+              {(!recentRequests?.items || recentRequests.items.length === 0) && (
                 <p className="text-center text-muted-foreground py-4">
                   {t("requests.empty.all")}
                 </p>

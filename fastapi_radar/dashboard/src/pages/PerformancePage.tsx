@@ -66,7 +66,7 @@ export function PerformancePage() {
 
   // Use centralized metrics calculations
   const metrics = useMetrics({
-    requests,
+    requests: requests?.items || null,
     queries,
     exceptions,
     stats,
@@ -138,14 +138,14 @@ export function PerformancePage() {
     {
       category: t("requests.statusFilters.clientErrors"),
       count:
-        requests?.filter(
+        requests?.items?.filter(
           (r) => r.status_code && r.status_code >= 400 && r.status_code < 500
         ).length || 0,
     },
     {
       category: t("requests.statusFilters.serverErrors"),
       count:
-        requests?.filter((r) => r.status_code && r.status_code >= 500).length ||
+        requests?.items?.filter((r) => r.status_code && r.status_code >= 500).length ||
         0,
     },
     { category: t("metrics.exceptions"), count: metrics.totalExceptions },

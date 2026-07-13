@@ -274,6 +274,8 @@ export interface Translations {
       failed: string;
       slow: string;
     };
+    loadMore: string;
+    loadingMore: string;
   };
 
   // Exceptions page
@@ -719,6 +721,8 @@ const en: Translations = {
       failed: "No failed requests",
       slow: "No slow requests",
     },
+    loadMore: "Load More",
+    loadingMore: "Loading...",
   },
 
   exceptions: {
@@ -1157,6 +1161,8 @@ const zh: Translations = {
       failed: "没有失败的请求",
       slow: "没有慢请求",
     },
+    loadMore: "加载更多",
+    loadingMore: "加载中...",
   },
 
   exceptions: {
