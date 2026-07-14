@@ -4,6 +4,7 @@ import json
 import time
 import traceback
 import uuid
+import asyncio
 from contextvars import ContextVar
 from typing import Optional
 
@@ -103,14 +104,6 @@ class RadarMiddleware(BaseHTTPMiddleware):
             client_ip=get_client_ip(request),
         )
 
-        # Save initial record (Tortoise create)
-        # Note: We must save it to get an ID or at least persist it so we can update it later.
-        try:
-            await captured_request.save()
-        except Exception:
-            # If DB fails, we proceed but logging might be broken
-            pass
-
         response = None
         exception_occurred = False
 
@@ -121,30 +114,19 @@ class RadarMiddleware(BaseHTTPMiddleware):
             captured_request.response_headers = serialize_headers(response.headers)
 
             if self.capture_response_body:
-
-                async def capture_response():
-                    response_body = ""
-                    capturing = True
-                    async for chunk in original_response.body_iterator:
-                        yield chunk
-                        if capturing:
-                            response_body += chunk.decode("utf-8", errors="ignore")
-                            try:
-                                captured_request.response_body = redact_sensitive_data(truncate_body(response_body, self.max_body_size))
-                                await captured_request.save()
-                            except Exception:
-                                # CapturedRequest record might be missing or DB error
-                                capturing = False
-                            else:
-                                capturing = len(response_body) < self.max_body_size
-
-                response = StreamingResponse(
-                    content=capture_response(),
+                response_body = b''.join([chunk async for chunk in original_response.body_iterator])
+                try:
+                    captured_request.response_body = redact_sensitive_data(
+                        truncate_body(response_body.decode("utf-8", errors="ignore"), self.max_body_size)
+                    )
+                except Exception:
+                    ...
+                response = Response(
+                    content=response_body,
                     status_code=response.status_code,
                     headers=dict(response.headers),
                     media_type=response.media_type,
                 )
-
         except Exception as e:
             exception_occurred = True
             self._capture_exception(request_id, e)
@@ -163,6 +145,7 @@ class RadarMiddleware(BaseHTTPMiddleware):
         finally:
             duration = round((time.time() - start_time) * 1000, 2)
             captured_request.duration_ms = duration
+            asyncio.create_task(captured_request.save())
 
             # Finish span tracking
             if trace_ctx and root_span_id:
@@ -177,8 +160,6 @@ class RadarMiddleware(BaseHTTPMiddleware):
                 )
 
             try:
-                await captured_request.save()
-
                 if exception_occurred:
                     exception_data = self._get_exception_data(request_id)
                     if exception_data:
