@@ -96,9 +96,13 @@ jobs:
 
   build-dashboard:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
     - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
 
     - name: Setup Node.js
       uses: actions/setup-node@v4
@@ -116,6 +120,13 @@ jobs:
     - name: Verify Dashboard Build
       run: |
         test -f fastapi_radar/dashboard/dist/index.html
+
+    - name: Commit built dashboard back to repo
+      if: github.event_name == 'push'
+      uses: stefanzweifel/git-auto-commit-action@v5
+      with:
+        commit_message: "构建: 重新编译 dashboard 静态资源"
+        file_pattern: fastapi_radar/dashboard/dist/
 
     - name: Upload dashboard artifact
       uses: actions/upload-artifact@v4
