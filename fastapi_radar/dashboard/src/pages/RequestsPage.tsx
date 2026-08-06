@@ -32,7 +32,7 @@ export function RequestsPage() {
   const [methodFilter, setMethodFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState("all");
-  const [timeRange, setTimeRange] = useState<number | null>(null);
+  const [timeRange, setTimeRange] = useState<number | null>(24);
   const [customStartTime, setCustomStartTime] = useState("");
   const [customEndTime, setCustomEndTime] = useState("");
   const [useCustomRange, setUseCustomRange] = useState(false);
@@ -138,7 +138,7 @@ export function RequestsPage() {
     return params;
   }, [statusFilter, methodFilter, debouncedSearchTerm, timeRange, useCustomRange, customStartTime, customEndTime, activeTab]);
 
-  const { data, fetchNextPage, hasNextPage, isFetchingNextPage, refetch } = useInfiniteQuery<
+  const { data, isSuccess, fetchNextPage, hasNextPage, isFetchingNextPage, refetch } = useInfiniteQuery<
     PaginatedRequestSummary,
     Error,
     InfiniteData<PaginatedRequestSummary, number | undefined>,
@@ -509,10 +509,12 @@ export function RequestsPage() {
               </CardTitle>
               <CardDescription>
                 {activeTab === "all" && t('requests.descriptions.all')}
-                {activeTab === "all" && totalRequests > 0 && (
+                {activeTab === "all" && (
                   <>
                     {" "}
-                    {t('requests.totalCount').replace("{count}", String(totalRequests))}
+                    {isSuccess
+                      ? t('requests.totalCount').replace("{count}", String(totalRequests))
+                      : t('requests.totalCountPlaceholder')}
                   </>
                 )}
                 {activeTab === "successful" && t('requests.descriptions.successful')}
