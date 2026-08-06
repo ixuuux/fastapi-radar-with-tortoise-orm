@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, InfiniteData } from "@tanstack/react-query";
 import { apiClient, PaginatedRequestSummary } from "@/api/client";
 import {
   Card,
@@ -138,7 +138,13 @@ export function RequestsPage() {
     return params;
   }, [statusFilter, methodFilter, debouncedSearchTerm, timeRange, useCustomRange, customStartTime, customEndTime, activeTab]);
 
-  const { data, fetchNextPage, hasNextPage, isFetchingNextPage, refetch } = useInfiniteQuery({
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage, refetch } = useInfiniteQuery<
+    PaginatedRequestSummary,
+    Error,
+    InfiniteData<PaginatedRequestSummary, number | undefined>,
+    (string | number | null)[],
+    number | undefined
+  >({
     queryKey: ["all-requests", statusFilter, methodFilter, debouncedSearchTerm, timeRange, activeTab],
     queryFn: async ({ pageParam }) => {
       const params = getFilterParams();
@@ -147,9 +153,14 @@ export function RequestsPage() {
       }
       return apiClient.getRequests(params);
     },
-    getNextPageParam: (lastPage: PaginatedRequestSummary) => {
-      if (lastPage.has_more && lastPage.items.length > 0) {
-        return lastPage.items[lastPage.items.length - 1].id;
+    getNextPageParam: (lastPage, allPages) => {
+      const loadedCount = allPages.reduce(
+        (n, p) => n + p.items.length,
+        0
+      );
+      const lastItem = lastPage.items[lastPage.items.length - 1];
+      if (lastPage.total > loadedCount && lastItem) {
+        return lastItem.id;
       }
       return undefined;
     },
@@ -159,6 +170,7 @@ export function RequestsPage() {
   });
 
   const allRequests = data?.pages.flatMap((page) => page.items) || [];
+  const totalRequests = data?.pages[0]?.total ?? 0;
 
   // Calculate counts for tabs
   const successfulCount =
@@ -497,6 +509,12 @@ export function RequestsPage() {
               </CardTitle>
               <CardDescription>
                 {activeTab === "all" && t('requests.descriptions.all')}
+                {activeTab === "all" && totalRequests > 0 && (
+                  <>
+                    {" "}
+                    {t('requests.totalCount').replace("{count}", String(totalRequests))}
+                  </>
+                )}
                 {activeTab === "successful" && t('requests.descriptions.successful')}
                 {activeTab === "failed" && t('requests.descriptions.failed')}
                 {activeTab === "slow" && t('requests.descriptions.slow')}

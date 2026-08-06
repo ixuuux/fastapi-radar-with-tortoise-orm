@@ -42,7 +42,7 @@ class RequestSummary(BaseModel):
 
 class PaginatedRequestSummary(BaseModel):
     items: List[RequestSummary]
-    has_more: bool
+    total: int
 
 
 class RequestDetail(BaseModel):
@@ -192,6 +192,8 @@ def create_api_router(auth_dependency: Optional[Callable] = None) -> APIRouter:
         if slow_threshold:
             query = query.filter(duration_ms__gte=slow_threshold)
 
+        total = await query.count()
+
         if cursor is not None:
             query = query.filter(id__lt=cursor)
             requests = await query.order_by("-created_at").limit(limit).prefetch_related("queries", "exceptions")
@@ -213,15 +215,7 @@ def create_api_router(auth_dependency: Optional[Callable] = None) -> APIRouter:
             for req in requests
         ]
 
-        has_more = False
-        if len(items) >= limit:
-            if cursor is not None:
-                last_id = items[-1].id if items else cursor
-                has_more = await query.filter(id__lt=last_id).exists()
-            else:
-                has_more = await query.offset(offset + limit).exists()
-
-        return PaginatedRequestSummary(items=items, has_more=has_more)
+        return PaginatedRequestSummary(items=items, total=total)
 
     @router.get("/requests/{request_id}", response_model=RequestDetail)
     async def get_request_detail(request_id: str):

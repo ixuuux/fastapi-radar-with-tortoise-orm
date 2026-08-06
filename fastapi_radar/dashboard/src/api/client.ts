@@ -12,7 +12,7 @@ export interface RequestSummary {
 
 export interface PaginatedRequestSummary {
   items: RequestSummary[];
-  has_more: boolean;
+  total: number;
 }
 
 export interface RequestDetail {

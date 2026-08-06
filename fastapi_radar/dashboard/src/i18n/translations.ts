@@ -268,6 +268,7 @@ export interface Translations {
       failed: string;
       slow: string;
     };
+    totalCount: string;
     empty: {
       all: string;
       successful: string;
@@ -715,6 +716,7 @@ const en: Translations = {
       failed: "Requests that resulted in errors (4xx and 5xx status codes)",
       slow: "Requests that took longer than 500ms",
     },
+    totalCount: " ({count} total)",
     empty: {
       all: "No requests captured yet",
       successful: "No successful requests",
@@ -1155,6 +1157,7 @@ const zh: Translations = {
       failed: "导致错误的请求 (4xx 和 5xx 状态码)",
       slow: "耗时超过 500ms 的请求",
     },
+    totalCount: "（共{count}条）",
     empty: {
       all: "尚未捕获任何请求",
       successful: "没有成功的请求",
