@@ -474,6 +474,14 @@ export interface Translations {
   layout: {
     connected: string;
   },
+
+  // Global API feedback (loading spinner & error dialog)
+  apiFeedback: {
+    loading: string;
+    errorTitle: string;
+    requestPath: string;
+    moreErrors: string;
+  },
 };
 
 
@@ -940,6 +948,13 @@ const en: Translations = {
   layout: {
     connected: "Connected",
   },
+
+  apiFeedback: {
+    loading: "Loading...",
+    errorTitle: "Request failed",
+    requestPath: "Request path",
+    moreErrors: "Multiple errors occurred",
+  },
 };
 
 // Chinese translations
@@ -1401,6 +1416,13 @@ const zh: Translations = {
 
   layout: {
     connected: "已连接",
+  },
+
+  apiFeedback: {
+    loading: "加载中...",
+    errorTitle: "请求失败",
+    requestPath: "请求路径",
+    moreErrors: "发生了多个错误",
   },
 };
 

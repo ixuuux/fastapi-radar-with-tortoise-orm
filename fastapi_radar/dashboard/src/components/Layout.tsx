@@ -29,8 +29,12 @@ export function Layout() {
 
   const handleClearData = async () => {
     if (confirm("Are you sure you want to clear all captured data?")) {
-      await apiClient.clearData();
-      await refetchAll();
+      try {
+        await apiClient.clearData();
+        await refetchAll();
+      } catch {
+        // Error dialog is shown globally via apiMonitor
+      }
     }
   };
 

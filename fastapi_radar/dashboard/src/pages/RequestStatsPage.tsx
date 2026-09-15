@@ -140,7 +140,7 @@ export function RequestStatsPage() {
   }, [statusFilter, methodFilter, debouncedSearchTerm, timeRange, useCustomRange, customStartTime, customEndTime]);
 
   const { data, isLoading, isSuccess, refetch } = useQuery({
-    queryKey: ["request-minute-stats", statusFilter, methodFilter, debouncedSearchTerm, timeRange, useCustomRange, customStartTime, customEndTime],
+    queryKey: ["request-minute-stats", statusFilter, methodFilter, debouncedSearchTerm, timeRange],
     queryFn: () => apiClient.getRequestMinuteStats(getFilterParams()),
     refetchInterval: 30000,
   });

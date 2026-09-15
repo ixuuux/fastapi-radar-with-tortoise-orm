@@ -1,3 +1,5 @@
+import { apiMonitor } from "./monitor";
+
 export interface RequestSummary {
   id: number;
   request_id: string;
@@ -152,8 +154,79 @@ export interface BackgroundTaskSummary {
   created_at: string;
 }
 
+export class ApiRequestError extends Error {
+  status?: number;
+  constructor(message: string, status?: number) {
+    super(message);
+    this.name = "ApiRequestError";
+    this.status = status;
+  }
+}
+
+function friendlyErrorMessage(error: unknown): string {
+  if (error instanceof ApiRequestError) {
+    return error.message;
+  }
+  if (error instanceof DOMException && error.name === "AbortError") {
+    return "Request timed out";
+  }
+  if (error instanceof TypeError) {
+    return "Network error: could not reach the server";
+  }
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+  return "Request failed";
+}
+
+const REQUEST_TIMEOUT_MS = 60000;
+
 class APIClient {
   private baseUrl = "/__radar/api";
+
+  private async request<T>(
+    endpoint: string,
+    init?: RequestInit
+  ): Promise<T> {
+    apiMonitor.start();
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(
+      () => controller.abort(),
+      REQUEST_TIMEOUT_MS
+    );
+    try {
+      const response = await fetch(endpoint, {
+        ...init,
+        signal: controller.signal,
+      });
+      if (!response.ok) {
+        let detail = `${response.status} ${response.statusText}`;
+        try {
+          const errorData = await response.json();
+          if (errorData?.detail) {
+            detail =
+              typeof errorData.detail === "string"
+                ? errorData.detail
+                : JSON.stringify(errorData.detail);
+          }
+        } catch {
+          // keep default status text
+        }
+        throw new ApiRequestError(detail, response.status);
+      }
+      const data = (await response.json()) as T;
+      apiMonitor.finish(true);
+      return data;
+    } catch (error) {
+      apiMonitor.finish(false, {
+        message: friendlyErrorMessage(error),
+        endpoint: endpoint.replace(this.baseUrl, "") || endpoint,
+      });
+      throw error;
+    } finally {
+      window.clearTimeout(timeoutId);
+    }
+  }
 
   async getRequests(params?: {
     limit?: number;
@@ -179,8 +252,9 @@ class APIClient {
     if (params?.slow_threshold)
       queryParams.append("slow_threshold", params.slow_threshold.toString());
 
-    const response = await fetch(`${this.baseUrl}/requests?${queryParams}`);
-    return response.json();
+    return this.request<PaginatedRequestSummary>(
+      `${this.baseUrl}/requests?${queryParams}`
+    );
   }
 
   async getRequestMinuteStats(params?: {
@@ -201,18 +275,21 @@ class APIClient {
     if (params?.slow_threshold)
       queryParams.append("slow_threshold", params.slow_threshold.toString());
 
-    const response = await fetch(`${this.baseUrl}/requests/minute-stats?${queryParams}`);
-    return response.json();
+    return this.request<MinuteStat[]>(
+      `${this.baseUrl}/requests/minute-stats?${queryParams}`
+    );
   }
 
   async getRequestDetail(requestId: string): Promise<RequestDetail> {
-    const response = await fetch(`${this.baseUrl}/requests/${requestId}`);
-    return response.json();
+    return this.request<RequestDetail>(
+      `${this.baseUrl}/requests/${requestId}`
+    );
   }
 
   async getRequestAsCurl(requestId: string): Promise<{ curl: string }> {
-    const response = await fetch(`${this.baseUrl}/requests/${requestId}/curl`);
-    return response.json();
+    return this.request<{ curl: string }>(
+      `${this.baseUrl}/requests/${requestId}/curl`
+    );
   }
 
   async replayRequest(
@@ -227,19 +304,19 @@ class APIClient {
     original_duration_ms: number | null;
     new_request_id: string;
   }> {
-    const response = await fetch(
-      `${this.baseUrl}/requests/${requestId}/replay`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: body ? JSON.stringify(body) : null,
-      }
-    );
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || "Replay failed");
-    }
-    return response.json();
+    return this.request<{
+      status_code: number;
+      headers: Record<string, string>;
+      body: string;
+      elapsed_ms: number;
+      original_status: number | null;
+      original_duration_ms: number | null;
+      new_request_id: string;
+    }>(`${this.baseUrl}/requests/${requestId}/replay`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: body ? JSON.stringify(body) : null,
+    });
   }
 
   async getQueries(params?: {
@@ -258,8 +335,7 @@ class APIClient {
       queryParams.append("slow_threshold", params.slow_threshold.toString());
     if (params?.search) queryParams.append("search", params.search);
 
-    const response = await fetch(`${this.baseUrl}/queries?${queryParams}`);
-    return response.json();
+    return this.request<QueryDetail[]>(`${this.baseUrl}/queries?${queryParams}`);
   }
 
   async getExceptions(params?: {
@@ -273,23 +349,23 @@ class APIClient {
     if (params?.exception_type)
       queryParams.append("exception_type", params.exception_type);
 
-    const response = await fetch(`${this.baseUrl}/exceptions?${queryParams}`);
-    return response.json();
+    return this.request<ExceptionDetail[]>(
+      `${this.baseUrl}/exceptions?${queryParams}`
+    );
   }
 
   async getStats(hours: number = 1): Promise<DashboardStats> {
-    const response = await fetch(`${this.baseUrl}/stats?hours=${hours}`);
-    return response.json();
+    return this.request<DashboardStats>(`${this.baseUrl}/stats?hours=${hours}`);
   }
 
   async clearData(olderThanHours?: number): Promise<{ message: string }> {
     const queryParams = olderThanHours
       ? `?older_than_hours=${olderThanHours}`
       : "";
-    const response = await fetch(`${this.baseUrl}/clear${queryParams}`, {
-      method: "DELETE",
-    });
-    return response.json();
+    return this.request<{ message: string }>(
+      `${this.baseUrl}/clear${queryParams}`,
+      { method: "DELETE" }
+    );
   }
 
   async getTraces(params?: {
@@ -310,18 +386,17 @@ class APIClient {
       queryParams.append("min_duration_ms", params.min_duration_ms.toString());
     if (params?.hours) queryParams.append("hours", params.hours.toString());
 
-    const response = await fetch(`${this.baseUrl}/traces?${queryParams}`);
-    return response.json();
+    return this.request<TraceSummary[]>(`${this.baseUrl}/traces?${queryParams}`);
   }
 
   async getTraceDetail(traceId: string): Promise<TraceDetail> {
-    const response = await fetch(`${this.baseUrl}/traces/${traceId}`);
-    return response.json();
+    return this.request<TraceDetail>(`${this.baseUrl}/traces/${traceId}`);
   }
 
   async getTraceWaterfall(traceId: string): Promise<WaterfallData> {
-    const response = await fetch(`${this.baseUrl}/traces/${traceId}/waterfall`);
-    return response.json();
+    return this.request<WaterfallData>(
+      `${this.baseUrl}/traces/${traceId}/waterfall`
+    );
   }
 
   async getBackgroundTasks(params?: {
@@ -336,12 +411,11 @@ class APIClient {
     if (params?.status) queryParams.append("status", params.status);
     if (params?.request_id) queryParams.append("request_id", params.request_id);
 
-    const response = await fetch(`${this.baseUrl}/background-tasks?${queryParams}`);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch background tasks: ${response.statusText}`);
-    }
-    return response.json();
+    return this.request<BackgroundTaskSummary[]>(
+      `${this.baseUrl}/background-tasks?${queryParams}`
+    );
   }
 }
 
 export const apiClient = new APIClient();
+

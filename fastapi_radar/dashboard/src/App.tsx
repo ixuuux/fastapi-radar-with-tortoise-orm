@@ -12,6 +12,7 @@ import { BackgroundTasksPage } from "@/pages/BackgroundTasksPage";
 
 import { DetailDrawerProvider } from "@/context/DetailDrawerContext";
 import { DetailDrawer } from "@/components/DetailDrawer";
+import { GlobalApiFeedback } from "@/components/GlobalApiFeedback";
 import { LanguageProvider, useT } from "@/i18n";
 import { useDetailDrawer } from "@/context/DetailDrawerContext";
 
@@ -50,6 +51,7 @@ function App() {
               </Route>
             </Routes>
             <DetailDrawerWrapper />
+            <GlobalApiFeedback />
           </BrowserRouter>
         </DetailDrawerProvider>
       </QueryClientProvider>

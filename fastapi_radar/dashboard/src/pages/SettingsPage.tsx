@@ -35,8 +35,12 @@ export function SettingsPage() {
 
   const handleClearData = async () => {
     if (confirm("Are you sure you want to clear all captured data?")) {
-      await apiClient.clearData();
-      window.location.reload();
+      try {
+        await apiClient.clearData();
+        window.location.reload();
+      } catch {
+        // Error dialog is shown globally via apiMonitor
+      }
     }
   };
 
@@ -46,8 +50,12 @@ export function SettingsPage() {
     if (
       confirm(`Are you sure you want to clear data older than ${displayDays}?`)
     ) {
-      await apiClient.clearData(hours);
-      window.location.reload();
+      try {
+        await apiClient.clearData(hours);
+        window.location.reload();
+      } catch {
+        // Error dialog is shown globally via apiMonitor
+      }
     }
   };
 
