@@ -10,6 +10,7 @@ import {
   Home,
   GitBranch,
   Zap,
+  BarChart3,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -33,6 +34,12 @@ const mainNavItemsConfig = [
     titleKey: "nav.requests",
     icon: Activity,
     href: "/requests",
+    badge: null,
+  },
+  {
+    titleKey: "nav.requestStats",
+    icon: BarChart3,
+    href: "/request-stats",
     badge: null,
   },
   {

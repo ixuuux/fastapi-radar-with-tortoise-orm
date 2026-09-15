@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Layout } from "@/components/Layout";
 import { DashboardPage } from "@/pages/DashboardPage";
 import { RequestsPage } from "@/pages/RequestsPage";
+import { RequestStatsPage } from "@/pages/RequestStatsPage";
 import { RequestDetailPage } from "@/pages/RequestDetailPage";
 import { TracingPage } from "@/pages/TracingPage";
 import { PerformancePage } from "@/pages/PerformancePage";
@@ -37,6 +38,7 @@ function App() {
                 <Route index element={<DashboardPage />} />
                 <Route path="requests" element={<RequestsPage />} />
                 <Route path="requests/:requestId" element={<RequestDetailPage />} />
+                <Route path="request-stats" element={<RequestStatsPage />} />
                 <Route path="tracing" element={<TracingPage />} />
                 <Route path="performance" element={<PerformancePage />} />
                 <Route path="database" element={<DatabasePageWrapped />} />

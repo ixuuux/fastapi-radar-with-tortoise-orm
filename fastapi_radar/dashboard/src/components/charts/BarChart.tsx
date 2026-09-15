@@ -62,15 +62,15 @@ export function BarChart({
     <ResponsiveContainer width="100%" height={height}>
       <RechartsBarChart
         data={data}
-        layout={horizontal ? "horizontal" : "vertical"}
+        layout={horizontal ? "vertical" : "horizontal"}
         margin={{ top: 5, right: 5, left: horizontal ? 50 : 0, bottom: 5 }}
       >
         {showGrid && (
           <CartesianGrid
             strokeDasharray="3 3"
             stroke={colors.grid}
-            vertical={!horizontal}
             horizontal={horizontal}
+            vertical={!horizontal}
             strokeOpacity={0.5}
           />
         )}
@@ -112,7 +112,10 @@ export function BarChart({
             />
           </>
         )}
-        <Tooltip content={<CustomTooltip />} />
+        <Tooltip
+          content={<CustomTooltip />}
+          cursor={{ fill: "rgba(128, 128, 128, 0.15)", stroke: "none" }}
+        />
         {showLegend && (
           <Legend iconType="rect" wrapperStyle={{ fontSize: 11 }} />
         )}

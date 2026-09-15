@@ -40,6 +40,11 @@ class RequestSummary(BaseModel):
     created_at: datetime
 
 
+class MinuteStat(BaseModel):
+    minute: datetime
+    count: int
+
+
 class PaginatedRequestSummary(BaseModel):
     items: List[RequestSummary]
     total: int
@@ -216,6 +221,72 @@ def create_api_router(auth_dependency: Optional[Callable] = None) -> APIRouter:
         ]
 
         return PaginatedRequestSummary(items=items, total=total)
+
+    @router.get("/requests/minute-stats", response_model=List[MinuteStat])
+    async def get_request_minute_stats(
+        start_time: Optional[datetime] = None,
+        end_time: Optional[datetime] = None,
+        status_code: Optional[int] = None,
+        method: Optional[str] = None,
+        search: Optional[str] = None,
+        slow_threshold: Optional[int] = Query(None, ge=0),
+    ):
+        """Per-minute request counts within the filtered time range."""
+        query = CapturedRequest.all()
+
+        if start_time:
+            query = query.filter(created_at__gte=start_time)
+        else:
+            query = query.filter(created_at__gte=datetime.now(timezone.utc) - timedelta(hours=1))
+        if end_time:
+            query = query.filter(created_at__lte=end_time)
+        if status_code:
+            if status_code in [200, 300, 400, 500]:
+                lower_bound = status_code
+                upper_bound = status_code + 100
+                query = query.filter(
+                    status_code__gte=lower_bound,
+                    status_code__lt=upper_bound,
+                )
+            else:
+                query = query.filter(status_code=status_code)
+        if method:
+            query = query.filter(method=method)
+        if search:
+            query = query.filter(path__icontains=search)
+        if slow_threshold:
+            query = query.filter(duration_ms__gte=slow_threshold)
+
+        # Group rows by minute in Python for cross-DB compatibility
+        # (tortoise.functions.Trunc is not available in older versions).
+        created_values = await query.values_list("created_at", flat=True)
+
+        counts: Dict[datetime, int] = {}
+        for created_at in created_values:
+            if created_at.tzinfo is None:
+                created_at = created_at.replace(tzinfo=timezone.utc)
+            minute = created_at.replace(second=0, microsecond=0)
+            counts[minute] = counts.get(minute, 0) + 1
+
+        now = datetime.now(timezone.utc)
+        if end_time:
+            range_end = end_time if end_time.tzinfo else end_time.replace(tzinfo=timezone.utc)
+        else:
+            range_end = now
+        range_start = start_time if start_time else now - timedelta(hours=1)
+        range_start = range_start if range_start.tzinfo else range_start.replace(tzinfo=timezone.utc)
+
+        # Align the bucket range to whole minutes
+        start_minute = range_start.replace(second=0, microsecond=0)
+        end_minute = range_end.replace(second=0, microsecond=0)
+
+        stats = []
+        minute = start_minute
+        while minute <= end_minute:
+            stats.append(MinuteStat(minute=minute, count=counts.get(minute, 0)))
+            minute += timedelta(minutes=1)
+
+        return stats
 
     @router.get("/requests/{request_id}", response_model=RequestDetail)
     async def get_request_detail(request_id: str):

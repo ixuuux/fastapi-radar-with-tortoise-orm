@@ -8,6 +8,7 @@ export interface Translations {
   nav: {
     dashboard: string;
     requests: string;
+    requestStats: string;
     tracking: string;
     database: string;
     exceptions: string;
@@ -31,6 +32,10 @@ export interface Translations {
       description: string;
     };
     requests: {
+      title: string;
+      description: string;
+    };
+    requestStats: {
       title: string;
       description: string;
     };
@@ -280,6 +285,20 @@ export interface Translations {
     loadingMore: string;
   };
 
+  // Request stats page
+  requestStats: {
+    filters: {
+      description: string;
+    };
+    chart: {
+      title: string;
+      description: string;
+      concurrency: string;
+      maxPerMinute: string;
+      empty: string;
+    };
+  };
+
   // Exceptions page
   exceptions: {
     noExceptions: string;
@@ -461,6 +480,7 @@ const en: Translations = {
   nav: {
     dashboard: "Dashboard",
     requests: "Requests",
+    requestStats: "Request Stats",
     tracking: "Tracking",
     database: "Database",
     exceptions: "Exceptions",
@@ -484,6 +504,10 @@ const en: Translations = {
     requests: {
       title: "Requests",
       description: "Monitor HTTP requests and responses",
+    },
+    requestStats: {
+      title: "Request Stats",
+      description: "Per-minute request concurrency statistics",
     },
     tracing: {
       title: "Tracing",
@@ -729,6 +753,19 @@ const en: Translations = {
     loadingMore: "Loading...",
   },
 
+  requestStats: {
+    filters: {
+      description: "Filter requests within a time range and view per-minute counts",
+    },
+    chart: {
+      title: "Requests Per Minute",
+      description: "Request counts aggregated by minute",
+      concurrency: "Requests",
+      maxPerMinute: "Peak: {count} requests/min",
+      empty: "No data for the selected range",
+    },
+  },
+
   exceptions: {
     noExceptions: "No exceptions found",
     recentExceptions: "Recent Exceptions",
@@ -906,6 +943,7 @@ const zh: Translations = {
   nav: {
     dashboard: "仪表板",
     requests: "请求监控",
+    requestStats: "请求统计",
     tracking: "链路跟踪",
     database: "数据库",
     exceptions: "异常监控",
@@ -929,6 +967,10 @@ const zh: Translations = {
     requests: {
       title: "请求监控",
       description: "监控 HTTP 请求和响应",
+    },
+    requestStats: {
+      title: "请求统计",
+      description: "按分钟统计的请求并发情况",
     },
     tracing: {
       title: "链路跟踪",
@@ -1169,6 +1211,19 @@ const zh: Translations = {
     },
     loadMore: "加载更多",
     loadingMore: "加载中...",
+  },
+
+  requestStats: {
+    filters: {
+      description: "筛选时间范围内的请求，并查看每分钟的请求数",
+    },
+    chart: {
+      title: "每分钟请求数",
+      description: "按分钟聚合的请求数量",
+      concurrency: "请求数",
+      maxPerMinute: "峰值：{count} 次/分钟",
+      empty: "所选时间范围内暂无数据",
+    },
   },
 
   exceptions: {
