@@ -8,7 +8,9 @@ import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
+from tortoise import connections
 from tortoise.functions import Avg, Count
+from tortoise.expressions import RawSQL
 
 from .models import (
     BackgroundTask,
@@ -224,62 +226,99 @@ def create_api_router(auth_dependency: Optional[Callable] = None) -> APIRouter:
 
     @router.get("/requests/minute-stats", response_model=List[MinuteStat])
     async def get_request_minute_stats(
-        start_time: Optional[datetime] = None,
-        end_time: Optional[datetime] = None,
-        status_code: Optional[int] = None,
-        method: Optional[str] = None,
-        search: Optional[str] = None,
-        slow_threshold: Optional[int] = Query(None, ge=0),
+            start_time: Optional[datetime] = None,
+            end_time: Optional[datetime] = None,
+            status_code: Optional[int] = None,
+            method: Optional[str] = None,
+            search: Optional[str] = None,
+            slow_threshold: Optional[int] = Query(None, ge=0),
     ):
         """Per-minute request counts within the filtered time range."""
-        query = CapturedRequest.all()
-
-        if start_time:
-            query = query.filter(created_at__gte=start_time)
-        else:
-            query = query.filter(created_at__gte=datetime.now(timezone.utc) - timedelta(hours=1))
-        if end_time:
-            query = query.filter(created_at__lte=end_time)
-        if status_code:
-            if status_code in [200, 300, 400, 500]:
-                lower_bound = status_code
-                upper_bound = status_code + 100
-                query = query.filter(
-                    status_code__gte=lower_bound,
-                    status_code__lt=upper_bound,
-                )
-            else:
-                query = query.filter(status_code=status_code)
-        if method:
-            query = query.filter(method=method)
-        if search:
-            query = query.filter(path__icontains=search)
-        if slow_threshold:
-            query = query.filter(duration_ms__gte=slow_threshold)
-
-        # Group rows by minute in Python for cross-DB compatibility
-        # (tortoise.functions.Trunc is not available in older versions).
-        created_values = await query.values_list("created_at", flat=True)
-
-        counts: Dict[datetime, int] = {}
-        for created_at in created_values:
-            if created_at.tzinfo is None:
-                created_at = created_at.replace(tzinfo=timezone.utc)
-            minute = created_at.replace(second=0, microsecond=0)
-            counts[minute] = counts.get(minute, 0) + 1
-
         now = datetime.now(timezone.utc)
-        if end_time:
-            range_end = end_time if end_time.tzinfo else end_time.replace(tzinfo=timezone.utc)
-        else:
-            range_end = now
-        range_start = start_time if start_time else now - timedelta(hours=1)
-        range_start = range_start if range_start.tzinfo else range_start.replace(tzinfo=timezone.utc)
 
-        # Align the bucket range to whole minutes
+        range_start = start_time or (now - timedelta(hours=1))
+        range_end = end_time or now
+
+        # 保证带时区
+        if range_start.tzinfo is None:
+            range_start = range_start.replace(tzinfo=timezone.utc)
+        if range_end.tzinfo is None:
+            range_end = range_end.replace(tzinfo=timezone.utc)
+
+        # 可选：限制最大查询范围，防止极端大范围拖垮数据库
+        if (range_end - range_start) > timedelta(days=15):
+            raise HTTPException(status_code=400, detail="时间范围不能超过 15 天")
+
+        # 对齐到整分钟
         start_minute = range_start.replace(second=0, microsecond=0)
         end_minute = range_end.replace(second=0, microsecond=0)
 
+        # ---------- 构建查询 ----------
+        query = CapturedRequest.all()
+
+        query = query.filter(created_at__gte=range_start, created_at__lte=range_end)
+
+        if status_code is not None:
+            if status_code in (200, 300, 400, 500):
+                query = query.filter(
+                    status_code__gte=status_code,
+                    status_code__lt=status_code + 100,
+                )
+            else:
+                query = query.filter(status_code=status_code)
+
+        if method:
+            query = query.filter(method=method)
+
+        if search:
+            query = query.filter(path__icontains=search)
+
+        if slow_threshold is not None:
+            query = query.filter(duration_ms__gte=slow_threshold)
+
+        # ---------- 核心：数据库层按分钟聚合 ----------
+        conn = connections.get("default")
+        backend = conn.capabilities.dialect  # 'sqlite' 或 'mysql' 等
+        # SQLite
+        if backend == "sqlite":
+            minute_expr = "strftime('%Y-%m-%d %H:%M:00', created_at)"
+        # MySQL / MariaDB
+        elif backend in ("mysql", "mariadb"):
+            minute_expr = "DATE_FORMAT(created_at, '%Y-%m-%d %H:%i:00')"
+        # PostgreSQL
+        elif backend == "postgres":
+            minute_expr = "date_trunc('minute', created_at)"
+        else:
+            raise NotImplementedError(f"暂不支持数据库: {backend}")
+
+        results = await (
+            query
+            .annotate(
+                minute=RawSQL(minute_expr),
+                cnt=Count("id"),
+            )
+            .group_by("minute")
+            .values("minute", "cnt")
+        )
+
+        # 转成 dict
+        counts: Dict[datetime, int] = {}
+        for row in results:
+            # 不同数据库返回的格式可能略有差异，统一解析
+            minute_str = row["minute"]
+            if isinstance(minute_str, datetime):
+                minute = minute_str.replace(tzinfo=timezone.utc)
+            else:
+                # 字符串情况（SQLite / MySQL 常见）
+                # 兼容 'YYYY-MM-DD HH:MM:00' 或带微秒的情况
+                try:
+                    minute = datetime.strptime(str(minute_str)[:19], "%Y-%m-%d %H:%M:%S")
+                except ValueError:
+                    minute = datetime.fromisoformat(str(minute_str).replace("Z", "+00:00"))
+                minute = minute.replace(tzinfo=timezone.utc)
+            counts[minute] = row["cnt"]
+
+        # ---------- 补全缺失的分钟 ----------
         stats = []
         minute = start_minute
         while minute <= end_minute:
