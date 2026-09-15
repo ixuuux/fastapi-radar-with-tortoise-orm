@@ -255,6 +255,8 @@ export interface Translations {
     timeRangeFilters: {
       all: string;
       lastHour: string;
+      last3Hours: string;
+      last12Hours: string;
       last24Hours: string;
       last7Days: string;
       custom: string;
@@ -723,6 +725,8 @@ const en: Translations = {
     timeRangeFilters: {
       all: "All Time",
       lastHour: "Last Hour",
+      last3Hours: "Last 3 Hours",
+      last12Hours: "Last 12 Hours",
       last24Hours: "Last 24 Hours",
       last7Days: "Last 7 Days",
       custom: "Custom Range",
@@ -1183,6 +1187,8 @@ const zh: Translations = {
     timeRangeFilters: {
       all: "所有时间",
       lastHour: "最近1小时",
+      last3Hours: "最近3小时",
+      last12Hours: "最近12小时",
       last24Hours: "最近24小时",
       last7Days: "最近7天",
       custom: "自定义范围",

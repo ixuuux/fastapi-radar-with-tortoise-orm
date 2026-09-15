@@ -23,7 +23,7 @@ export function RequestStatsPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [methodFilter, setMethodFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
-  const [timeRange, setTimeRange] = useState<number | null>(1);
+  const [timeRange, setTimeRange] = useState<number>(1);
   const [customStartTime, setCustomStartTime] = useState("");
   const [customEndTime, setCustomEndTime] = useState("");
   const [useCustomRange, setUseCustomRange] = useState(false);
@@ -247,13 +247,6 @@ export function RequestStatsPage() {
               <Label>{t("requests.filters.timeRange")}</Label>
               <div className="flex flex-wrap gap-2">
                 <Button
-                  variant={!useCustomRange && timeRange === null ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => { setTimeRange(null); setUseCustomRange(false); }}
-                >
-                  {t("requests.timeRangeFilters.all")}
-                </Button>
-                <Button
                   variant={!useCustomRange && timeRange === 1 ? "default" : "outline"}
                   size="sm"
                   onClick={() => { setTimeRange(1); setUseCustomRange(false); }}
@@ -261,18 +254,25 @@ export function RequestStatsPage() {
                   {t("requests.timeRangeFilters.lastHour")}
                 </Button>
                 <Button
+                  variant={!useCustomRange && timeRange === 3 ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => { setTimeRange(3); setUseCustomRange(false); }}
+                >
+                  {t("requests.timeRangeFilters.last3Hours")}
+                </Button>
+                <Button
+                  variant={!useCustomRange && timeRange === 12 ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => { setTimeRange(12); setUseCustomRange(false); }}
+                >
+                  {t("requests.timeRangeFilters.last12Hours")}
+                </Button>
+                <Button
                   variant={!useCustomRange && timeRange === 24 ? "default" : "outline"}
                   size="sm"
                   onClick={() => { setTimeRange(24); setUseCustomRange(false); }}
                 >
                   {t("requests.timeRangeFilters.last24Hours")}
-                </Button>
-                <Button
-                  variant={!useCustomRange && timeRange === 168 ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => { setTimeRange(168); setUseCustomRange(false); }}
-                >
-                  {t("requests.timeRangeFilters.last7Days")}
                 </Button>
                 <Button
                   variant={useCustomRange ? "default" : "outline"}
